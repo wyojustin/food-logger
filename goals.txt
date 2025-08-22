@@ -1,0 +1,40 @@
+GOALS for New Version of Food Logger
+================================================
+
+(MUST HAVE)
+-----------
+1. One button per food type on the main GUI
+   - Replaces drop-down for faster touchscreen logging
+
+2. Save a permanent record of every entry AND deletion
+   - Suggest using a lightweight SQLite3 database (with timestamps, type, source, and action type)
+
+3. Fix bug where the first item is not recorded
+   - Possibly related to GUI not refreshing scale value before first record()
+
+(NICE TO HAVE)
+--------------
+4. Email report generation
+   - Auto-send summary reports at intervals (e.g., daily or weekly)
+   - Could attach CSV or summary PDF
+
+(SUGGESTED ADDITIONS)
+---------------------
+5. Modular code structure (GUI logic, scale interface, storage)
+   - Easier to test and maintain
+
+6. Offline-first design
+   - Avoid cloud dependency; sync only when requested
+
+7. CSV export from database
+   - GUI option to export per-source/per-day logs
+
+8. Logging and error recovery
+   - Log file for scale disconnects, errors, or corrupted inputs
+
+9. Future support for other scale types
+   - Abstract scale input logic
+
+10. Localized date/time format
+   - Adapt timestamp format based on user region
+

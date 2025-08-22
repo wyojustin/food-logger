@@ -1,5 +1,7 @@
 # 🥫 Food Logger – South Lakes Food Pantry Scale System
 
+![SLFP Logo](assets/slfp_logo.png)
+
 This project is a touchscreen-friendly Python app for logging food donations by weight, using a DYMO S100 USB scale. It is used by South Lakes Food Pantry to track donation types and sources efficiently.
 
 ---
@@ -29,6 +31,7 @@ food-logger/
 │   └── logger_gui.py
 ├── assets/                # Logos, icons
 │   ├── scale_icon.png
+│   ├── scale_icon.ico
 │   └── slfp_logo.png
 ├── environment.yml        # Conda env file
 ├── .gitignore

@@ -132,57 +132,105 @@ class ScaleLoggerApp(tk.Tk):
             self.total_label.config(text="\n".join(lines))
         except Exception as e:
             self.total_label.config(text=f"Error: {e}")
+
     def open_report_popup(self):
         popup = tk.Toplevel(self)
         popup.title("Generate Report")
-        popup.geometry("300x200")
+        popup.geometry("320x260")
     
         today = datetime.now().date()
     
-        ttk.Label(popup, text="Start Date:").pack(pady=(10, 0))
-        start_cal = DateEntry(popup, width=12, background='darkblue',
-                              foreground='white', borderwidth=2, year=today.year,
-                              month=today.month, day=today.day)
-        start_cal.pack(pady=5)
+        # Start Date
+        ttk.Label(popup, text="Start Date:").pack(pady=(12, 0))
+        start_cal = DateEntry(
+            popup, width=12, background='darkblue',
+            foreground='white', borderwidth=2,
+            year=today.year, month=today.month, day=today.day
+        )
+        start_cal.pack(pady=6)
     
-        ttk.Label(popup, text="End Date:").pack(pady=(10, 0))
-        end_cal = DateEntry(popup, width=12, background='darkblue',
-                            foreground='white', borderwidth=2, year=today.year,
-                            month=today.month, day=today.day)
-        end_cal.pack(pady=5)
+        # End Date
+        ttk.Label(popup, text="End Date:").pack(pady=(12, 0))
+        end_cal = DateEntry(
+            popup, width=12, background='darkblue',
+            foreground='white', borderwidth=2,
+            year=today.year, month=today.month, day=today.day
+        )
+        end_cal.pack(pady=6)
     
-        def save_report():
-            start = start_cal.get_date().isoformat()
-            end = end_cal.get_date().isoformat()
-            source = self.source_var.get()
-            cat_totals, total_weight, rows = db.create_report(source, start_date=start, end_date=end)
-    
-            file_path = filedialog.asksaveasfilename(defaultextension=".csv",
-                                                     filetypes=[("CSV files", "*.csv")],
-                                                     title="Save Report As")
-            if not file_path:
+        def generate_per_source_csvs():
+            base_dir = filedialog.askdirectory(title="Select base directory (Backups/ will be used)")
+            if not base_dir:
                 return
     
-            try:
-                with open(file_path, "w", newline="") as f:
-                    writer = csv.writer(f)
-                    writer.writerow(["Source", source])
-                    writer.writerow(["Start Date", start])
-                    writer.writerow(["End Date", end])
-                    writer.writerow([])
-                    writer.writerow(["Summary by Category"])
-                    for k, v in cat_totals.items():
-                        writer.writerow([k, f"{v:.1f}"])
-                    writer.writerow(["Total", f"{total_weight:.1f}"])
-                    writer.writerow([])
-                    writer.writerow(["Timestamp", "Weight", "Source", "Type", "Action"])
-                    for row in rows:
-                        writer.writerow(row)
-                messagebox.showinfo("Success", f"Report saved to:\n{file_path}")
-            except Exception as e:
-                messagebox.showerror("Error Saving", str(e))
+            start_date = start_cal.get_date().isoformat()  # YYYY-MM-DD
+            end_date   = end_cal.get_date().isoformat()
     
-        ttk.Button(popup, text="Save Report", command=save_report).pack(pady=15)
+            backups_dir = os.path.join(base_dir, "Backups")
+            os.makedirs(backups_dir, exist_ok=True)
+    
+            all_sources = db.get_sources()
+            conn = db.connect()
+            try:
+                any_written = False
+                for source_name in all_sources:
+                    rows = conn.execute(
+                        """
+                        SELECT
+                            logs.id,
+                            logs.timestamp,
+                            logs.weight_lb,
+                            s.name AS source_name,
+                            t.name AS type_name,
+                            logs.action
+                        FROM logs
+                        JOIN sources s ON s.id = logs.source_id
+                        JOIN types   t ON t.id = logs.type_id
+                        WHERE date(logs.timestamp) BETWEEN ? AND ?
+                          AND logs.action = 'record'
+                          AND s.name = ?
+                        ORDER BY logs.timestamp ASC
+                        """,
+                        (start_date, end_date, source_name),
+                    ).fetchall()
+    
+                    if not rows:
+                        continue
+    
+                    # Totals
+                    totals = {}
+                    for (_id, _ts, wt, _sname, tname, _act) in rows:
+                        totals[tname] = totals.get(tname, 0.0) + float(wt or 0.0)
+    
+                    # Filename includes range
+                    safe_src = source_name.replace(" ", "_")
+                    filename = f"{safe_src}_{start_date}_to_{end_date}.csv"
+                    filepath = os.path.join(backups_dir, filename)
+    
+                    with open(filepath, "w", newline="", encoding="utf-8") as f:
+                        writer = csv.writer(f)
+                        writer.writerow(["Summary by Category"])
+                        writer.writerow(["type_name", "total_weight_lb"])
+                        for tname, total in totals.items():
+                            writer.writerow([tname, f"{total:.1f}"])
+    
+                        writer.writerow([])
+                        writer.writerow(["id", "timestamp", "weight_lb", "source_name", "type_name", "action"])
+                        for r in rows:
+                            writer.writerow(r)
+    
+                    any_written = True
+    
+                if any_written:
+                    messagebox.showinfo("Success", f"CSV(s) saved under:\n{backups_dir}")
+                else:
+                    messagebox.showinfo("No Data", f"No logs found between {start_date} and {end_date}.")
+            except Exception as e:
+                messagebox.showerror("Error", str(e))
+            finally:
+                conn.close()
+    
+        ttk.Button(popup, text="Generate CSVs", command=generate_per_source_csvs).pack(pady=18)
     
 if __name__ == "__main__":
     db.initialize_db()
